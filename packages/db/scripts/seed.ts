@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { eq } from 'drizzle-orm'
 import { createDatabaseClient } from '../src/client.js'
 import { users } from '../src/schema/users.js'
 import { accounts } from '../src/schema/auth.js'
@@ -45,39 +46,49 @@ async function main() {
 
   // Seed users
   console.log('👥 Seeding users...')
-  const devUsers = [
+  const devUsersData = [
     {
-      id: 'user_demo',
       email: 'demo@stackit.dev',
       name: 'Demo User',
-      emailVerified: true,
-      image: null,
     },
     {
-      id: 'user_admin',
       email: 'admin@stackit.dev',
       name: 'Admin User',
-      emailVerified: true,
-      image: null,
     },
   ]
 
-  for (const userData of devUsers) {
-    await db
+  const createdUsers = []
+  for (const userData of devUsersData) {
+    const [user] = await db
       .insert(users)
       .values(userData)
       .onConflictDoNothing({ target: users.email })
-    console.log(`  ✓ Created user: ${userData.email}`)
+      .returning()
+
+    if (user) {
+      console.log(`  ✓ Created user: ${userData.email}`)
+      createdUsers.push(user)
+    } else {
+      // User already exists, fetch it
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, userData.email))
+      if (existingUser) {
+        console.log(`  ℹ️  User already exists: ${userData.email}`)
+        createdUsers.push(existingUser)
+      }
+    }
   }
 
   // Seed accounts with passwords
   console.log('\n🔑 Seeding accounts with passwords...')
-  const devAccounts = [
-    {
-      id: 'account_demo',
-      accountId: 'user_demo', // Same as userId for credential provider
+  for (const user of createdUsers) {
+    const accountData = {
+      id: `account_${user.email.split('@')[0]}`,
+      accountId: user.email, // Use email as accountId for credential provider
       providerId: 'credential',
-      userId: 'user_demo',
+      userId: user.id,
       password: hashedPassword,
       scope: null,
       accessToken: null,
@@ -85,28 +96,15 @@ async function main() {
       idToken: null,
       accessTokenExpiresAt: null,
       refreshTokenExpiresAt: null,
-    },
-    {
-      id: 'account_admin',
-      accountId: 'user_admin',
-      providerId: 'credential',
-      userId: 'user_admin',
-      password: hashedPassword,
-      scope: null,
-      accessToken: null,
-      refreshToken: null,
-      idToken: null,
-      accessTokenExpiresAt: null,
-      refreshTokenExpiresAt: null,
-    },
-  ]
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
 
-  for (const accountData of devAccounts) {
     await db
       .insert(accounts)
       .values(accountData)
-      .onConflictDoNothing({ target: [accounts.providerId, accounts.accountId] })
-    console.log(`  ✓ Created account: ${accountData.accountId}`)
+      .onConflictDoNothing({ target: accounts.id })
+    console.log(`  ✓ Created account: ${user.email}`)
   }
 
   console.log(`\n  ℹ️  Default password for all dev accounts: ${defaultPassword}`)
