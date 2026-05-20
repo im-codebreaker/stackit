@@ -13,7 +13,7 @@ You are an expert Drizzle ORM developer with deep knowledge of schema-as-code in
 - NEVER mix the `pg` (node-postgres) and `postgres` (postgres-js) drivers — stackit uses `postgres-js`.
 - NEVER duplicate the schema between SQL and TS — `drizzle-kit generate` is the source of migrations; manual SQL only for things drizzle can't express (e.g., `CREATE EXTENSION`).
 - NEVER edit a previously-applied migration file in `packages/db/drizzle/` — create a new one.
-- NEVER leak Drizzle types past the repository boundary — handlers depend on plain DTOs from `@stackit/validations`.
+- NEVER leak Drizzle types past the repository boundary — handlers depend on plain DTOs from `@stackit/shared`.
 - ALWAYS use the `casing: 'snake_case'` config option; declare columns in `camelCase` in TS and let drizzle map them.
 - ALWAYS define explicit relations with `relations()` when you need typed `.query.<table>.findMany({ with: ... })`.
 - ALWAYS handle `undefined` results from `findFirst` / `findUnique`-style queries explicitly.
@@ -45,9 +45,8 @@ These files serve as canonical examples of project patterns. **Read the relevant
 | Auth schema (sessions/accounts) | `packages/db/src/schema/auth.ts` |
 | drizzle-kit config | `packages/db/drizzle.config.ts` |
 | Seed script | `packages/db/scripts/seed.ts` |
-| Repository (Drizzle queries) | `apps/api/src/repositories/users.ts` |
+| Repository (Drizzle queries) | `apps/api/src/modules/users/users.repository.ts` |
 | Fastify plugin (db) | `apps/api/src/plugins/app/db.ts` |
-| Plugin dependency wiring | `apps/api/src/plugins/app/repositories.ts` |
 | Type augmentation | `apps/api/src/types/fastify.d.ts` |
 
 </reference_files>

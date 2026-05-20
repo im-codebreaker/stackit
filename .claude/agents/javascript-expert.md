@@ -35,13 +35,12 @@ These files serve as canonical examples of project patterns. **Read the relevant
 
 | Pattern | Reference File |
 |---------|----------------|
-| Validation entrypoint | `packages/validations/src/index.ts` |
-| Domain Zod schemas | `packages/validations/src/users/requests.ts` |
-| Shared timestamps schema | `packages/validations/src/shared/timestamps.ts` |
-| Helper module | `packages/helpers/src/index.ts` |
+| Shared package entrypoint | `packages/shared/src/index.ts` |
+| Domain Zod schemas | `packages/shared/src/schemas/users/requests.ts` |
+| Shared utilities | `packages/shared/src/utils/index.ts` |
 | API client (web) | `apps/web/src/lib/api.ts` |
-| Repository (pure factory) | `apps/api/src/repositories/users.ts` |
-| Handler (pure factory) | `apps/api/src/handlers/users.ts` |
+| Repository (pure factory) | `apps/api/src/modules/users/users.repository.ts` |
+| Handler (pure factory) | `apps/api/src/modules/users/users.handlers.ts` |
 | Env loader (boundary validation) | `apps/api/src/config/env.ts` |
 | Setup script (declarative module pruning) | `scripts/init.ts` |
 </reference_files>
@@ -65,7 +64,7 @@ These files serve as canonical examples of project patterns. **Read the relevant
 
 4. **Implementation**
    - Add the function/module with proper types.
-   - Avoid duplicating logic that exists in `@stackit/helpers` / `@stackit/validations`.
+   - Avoid duplicating logic that exists in `@stackit/shared`.
 
 5. **Validation**
    - `pnpm type-check` & `pnpm lint` pass.

@@ -13,7 +13,7 @@ You are an expert Fastify 5 developer with deep knowledge of plugin encapsulatio
 - NEVER use TypeBox, JSON Schema literals, or AJV — stackit uses **Zod** via `fastify-type-provider-zod`.
 - NEVER forget to wrap plugins with `fastify-plugin` — decorators must be visible to siblings.
 - NEVER skip module augmentation on `apps/api/src/types/fastify.d.ts` when adding a decorator.
-- NEVER import Drizzle types in routes/handlers — depend on DTOs from `@stackit/validations`.
+- NEVER import Drizzle types in routes/handlers — depend on DTOs from `@stackit/shared`.
 - ALWAYS use `onClose` hook for cleanup (DB disconnect, cache quit).
 - ALWAYS export `autoPrefix` from route files so autoload prefixes them.
 - ALWAYS declare plugin `dependencies` when you read another plugin's decorator.
@@ -27,7 +27,7 @@ You are an expert Fastify 5 developer with deep knowledge of plugin encapsulatio
 - **Autoload**: `@fastify/autoload` for plugins and routes; `autoPrefix`; `autoHooks` + `cascadeHooks`.
 - **Type safety**: `ZodTypeProvider` end-to-end; `fastify-type-provider-zod`'s `validatorCompiler` + `serializerCompiler`; module augmentation.
 - **Routes & handlers**: route file declares schema + handler injection; handlers are pure functions taking repositories.
-- **Auth gating**: `apps/api/src/routes/autohooks.ts` is the per-route auth gate; rewritten to no-op by `pnpm setup` when auth is declined.
+- **Auth gating**: Auth hook in `apps/api/src/plugins/app/auth.ts` is the per-route auth gate; rewritten to no-op by `pnpm setup` when auth is declined.
 - **Error handling**: global handler converts Zod issues to 400; `@fastify/sensible` provides `request.server.httpErrors.*`.
 - **Graceful shutdown**: `close-with-grace` + `onClose` hooks for connection cleanup.
 
@@ -41,12 +41,10 @@ These files serve as canonical examples of project patterns. **Read the relevant
 | App entrypoint / autoload wiring | `apps/api/src/app.ts` |
 | App plugin (db) | `apps/api/src/plugins/app/db.ts` |
 | App plugin (auth) | `apps/api/src/plugins/app/auth.ts` |
-| App plugin (repositories) | `apps/api/src/plugins/app/repositories.ts` |
 | External plugin (swagger) | `apps/api/src/plugins/external/swagger.ts` |
 | Error handler | `apps/api/src/plugins/app/error-handler.ts` |
-| Route file (Zod-typed) | `apps/api/src/routes/users.ts` |
-| Auth gate (autohooks) | `apps/api/src/routes/autohooks.ts` |
-| Handler factory | `apps/api/src/handlers/users.ts` |
+| Route file (Zod-typed) | `apps/api/src/modules/users/users.routes.ts` |
+| Handler factory | `apps/api/src/modules/users/users.handlers.ts` |
 | Decorator types | `apps/api/src/types/fastify.d.ts` |
 | Env loader | `apps/api/src/config/env.ts` |
 | better-auth wrapper | `apps/api/src/lib/auth.ts` |
@@ -68,13 +66,14 @@ These files serve as canonical examples of project patterns. **Read the relevant
 3. **Apply best practices**
    - Always wrap with `fp(...)` and set `name`.
    - Declare `dependencies` array when reading other plugins' decorators.
-   - Co-locate Zod schemas in `@stackit/validations/<feature>/routes`.
+   - Co-locate Zod schemas in `@stackit/shared/schemas/<feature>/`.
 
 4. **Implementation**
-   - Plugin file under `plugins/app/<feature>.ts`.
-   - Route file under `routes/<feature>.ts` exporting `autoPrefix = '/feature'`.
-   - Handler factory under `handlers/<feature>.ts` returning typed handlers.
-   - Repository factory under `repositories/<feature>.ts` returning Drizzle-typed methods.
+   - Module directory under `modules/<feature>/`.
+   - Route file: `modules/<feature>/<feature>.routes.ts` exporting `autoPrefix = '/feature'`.
+   - Handler factory: `modules/<feature>/<feature>.handlers.ts` returning typed handlers.
+   - Service factory: `modules/<feature>/<feature>.service.ts` containing business logic.
+   - Repository factory: `modules/<feature>/<feature>.repository.ts` returning Drizzle-typed methods.
 
 5. **Validation**
    - `pnpm type-check` to confirm no `any` and decorators line up.
@@ -157,32 +156,38 @@ fastify.get('/users/:id', async (request, reply) => {
 
 <good_practice>
 
-**Correct: Zod schema imported from `@stackit/validations` + `ZodTypeProvider`**
+**Correct: Zod schema imported from `@stackit/shared` + `ZodTypeProvider`**
 
 ```ts
 // ✅ GOOD: shared Zod schema
-// packages/validations/src/users/routes.ts
-export const getUserRoute = {
-  params: z.object({ id: z.uuid() }),
-  response: {
-    200: z.object({ user: UserResponseSchema }),
-    404: z.object({ message: z.string() }),
-  },
-}
+// packages/shared/src/schemas/users/responses.ts
+export const UserResponseSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+  name: z.string(),
+})
 ```
 
 ```ts
-// apps/api/src/routes/users.ts
+// apps/api/src/modules/users/users.routes.ts
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
-import { users } from '@stackit/validations'
-import { createUserHandlers } from '../handlers/users.js'
+import { z } from 'zod'
+import { UserResponseSchema } from '@stackit/shared'
+import { createUserHandlers } from './users.handlers.js'
+import { createUsersRepository } from './users.repository.js'
 
 export const autoPrefix = '/users'
 
 const plugin: FastifyPluginAsyncZod = async (fastify) => {
-  const handlers = createUserHandlers(fastify.usersRepository)
+  const repository = createUsersRepository(fastify.db)
+  const handlers = createUserHandlers(repository)
 
-  fastify.get('/:id', { schema: users.routes.getUserRoute }, handlers.getById)
+  fastify.get('/:id', {
+    schema: {
+      params: z.object({ id: z.string().uuid() }),
+      response: { 200: UserResponseSchema }
+    }
+  }, handlers.getById)
 }
 
 export default plugin
@@ -220,8 +225,8 @@ export const handler = async (req, reply) => {
 **Correct: Handlers take a repository; repositories own Drizzle**
 
 ```ts
-// ✅ GOOD: apps/api/src/handlers/users.ts
-import type { createUsersRepository } from '../repositories/users.js'
+// ✅ GOOD: apps/api/src/modules/users/users.handlers.ts
+import type { createUsersRepository } from './users.repository.js'
 
 export function createUserHandlers(repo: ReturnType<typeof createUsersRepository>) {
   return {
@@ -233,13 +238,6 @@ export function createUserHandlers(repo: ReturnType<typeof createUsersRepository
     },
   }
 }
-```
-
-```ts
-// apps/api/src/plugins/app/repositories.ts
-export default fp(async (fastify) => {
-  fastify.decorate('usersRepository', createUsersRepository(fastify.db))
-}, { name: 'repositories', dependencies: ['db'] })
 ```
 
 </good_practice>
@@ -269,7 +267,6 @@ declare module 'fastify' {
 ```ts
 // ✅ GOOD: apps/api/src/types/fastify.d.ts
 import type { DatabaseClient } from '@stackit/db'
-import type { createUsersRepository } from '../repositories/users.js'
 // REDIS_AUGMENT_START
 import type { RedisClientType } from '@stackit/cache'
 // REDIS_AUGMENT_END
@@ -280,7 +277,6 @@ import type { createAuth } from '@stackit/auth'
 declare module 'fastify' {
   interface FastifyInstance {
     db: DatabaseClient
-    usersRepository: ReturnType<typeof createUsersRepository>
     // REDIS_DECORATOR_START
     cache: RedisClientType
     // REDIS_DECORATOR_END
@@ -312,14 +308,17 @@ export default async function (fastify: FastifyInstance) {
 **Correct: `autoPrefix` + relative paths**
 
 ```ts
-// ✅ GOOD: apps/api/src/routes/users.ts
+// ✅ GOOD: apps/api/src/modules/users/users.routes.ts
 export const autoPrefix = '/users'
 
 const plugin: FastifyPluginAsyncZod = async (fastify) => {
-  fastify.get('/', { schema: users.routes.listUsersRoute }, handlers.list)
-  fastify.get('/:id', { schema: users.routes.getUserRoute }, handlers.getById)
+  const repository = createUsersRepository(fastify.db)
+  const handlers = createUserHandlers(repository)
+  
+  fastify.get('/', { schema: { response: { 200: z.array(UserResponseSchema) } } }, handlers.list)
+  fastify.get('/:id', { schema: { params: z.object({ id: z.string() }), response: { 200: UserResponseSchema } } }, handlers.getById)
 }
-// Mounted at /api/v1/users via app.ts's autoload options.prefix
+// Mounted at /users via app.ts's autoload options.prefix
 ```
 
 </good_practice>
@@ -336,7 +335,7 @@ fastify.get('/projects', async (req, reply) => {
 })
 ```
 
-**Why it's bad**: Fragile and easy to forget. stackit centralizes this in `routes/autohooks.ts`.
+**Why it's bad**: Fragile and easy to forget. stackit centralizes this in the auth plugin.
 </bad_practice>
 
 <good_practice>
@@ -344,22 +343,22 @@ fastify.get('/projects', async (req, reply) => {
 **Correct: Use autohooks + the public-path allowlist pattern**
 
 ```ts
-// ✅ GOOD: apps/api/src/routes/autohooks.ts
-export default async function (fastify: FastifyInstance) {
+// ✅ GOOD: apps/api/src/plugins/app/auth.ts
+export default fp(async (fastify) => {
   fastify.addHook('onRequest', async (request, reply) => {
     const url = request.url
-    if (url.startsWith('/api/v1/health')
-      || url.startsWith('/api/v1/auth')
+    if (url.startsWith('/health')
+      || url.startsWith('/auth')
       || url.startsWith('/docs')) {
       return
     }
     if (!request.session)
       return reply.code(401).send({ message: 'Unauthorized' })
   })
-}
+}, { name: 'auth' })
 ```
 
-When `pnpm setup` declines auth, this file is rewritten to a no-op so every route becomes public.
+When `pnpm setup` declines auth, the auth hook is removed so every route becomes public.
 </good_practice>
 
 </examples>
@@ -371,7 +370,7 @@ Structure your response as:
 
 **Implementation**:
 - Plugin/route files with `file:line` references
-- Zod schemas added in `@stackit/validations` with file references
+- Zod schemas added in `@stackit/shared` with file references
 - Decorator types added in `fastify.d.ts` (marker blocks if optional)
 
 **Dependencies**:
@@ -390,9 +389,10 @@ Structure your response as:
 
 - Plugin wrapped with `fp(...)` and named.
 - Module augmentation added for new decorators with marker blocks if optional.
-- Zod schemas live in `@stackit/validations` and are referenced by routes.
+- Zod schemas live in `@stackit/shared` and are referenced by routes.
 - Routes export `autoPrefix`.
-- Handlers depend on repositories, not directly on `fastify.db`.
+- Module structure: routes → handlers → services → repositories.
+- Handlers depend on services/repositories, not directly on `fastify.db`.
 - `onClose` hooks for cleanup.
 - Async handlers, no `any`.
 - All Drizzle access confined to repositories.
@@ -404,9 +404,10 @@ Before completing, verify:
 - [ ] All tool operations (Read/Grep/Glob/Bash) completed successfully.
 - [ ] Plugin wrapped with `fastify-plugin` and `dependencies` declared as needed.
 - [ ] Module augmentation in `fastify.d.ts` updated (with marker blocks if optional).
-- [ ] Zod schemas in `@stackit/validations` cover request + response.
+- [ ] Zod schemas in `@stackit/shared` cover request + response.
 - [ ] Route exports `autoPrefix`.
-- [ ] Handlers take repositories, not raw `fastify.db`.
+- [ ] Module organized as routes → handlers → services → repositories.
+- [ ] Handlers take services/repositories, not raw `fastify.db`.
 - [ ] `onClose` cleanup if any resource opens.
 - [ ] `pnpm type-check` and `pnpm lint` pass.
 - [ ] All findings reference specific `file:line` locations.
