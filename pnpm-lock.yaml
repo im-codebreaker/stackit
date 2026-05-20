@@ -65,15 +65,9 @@ importers:
       '@stackit/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@stackit/helpers':
+      '@stackit/shared':
         specifier: workspace:*
-        version: link:../../packages/helpers
-      '@stackit/types':
-        specifier: workspace:*
-        version: link:../../packages/types
-      '@stackit/validations':
-        specifier: workspace:*
-        version: link:../../packages/validations
+        version: link:../../packages/shared
       better-auth:
         specifier: ^1.4.4
         version: 1.6.11(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(kysely@0.28.17)(postgres@3.4.9))(vitest@4.1.6(@types/node@24.12.4)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.0)(yaml@2.9.0)))(vue@3.5.34(typescript@5.9.3))
@@ -132,15 +126,9 @@ importers:
       '@stackit/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@stackit/helpers':
+      '@stackit/shared':
         specifier: workspace:*
-        version: link:../../packages/helpers
-      '@stackit/types':
-        specifier: workspace:*
-        version: link:../../packages/types
-      '@stackit/validations':
-        specifier: workspace:*
-        version: link:../../packages/validations
+        version: link:../../packages/shared
       '@tailwindcss/vite':
         specifier: ^4.1.17
         version: 4.3.0(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.0)(yaml@2.9.0))
@@ -298,28 +286,10 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/helpers:
-    devDependencies:
-      '@stackit/eslint-config':
-        specifier: workspace:*
-        version: link:../config/eslint-config
-      '@stackit/tsconfig':
-        specifier: workspace:*
-        version: link:../config/tsconfig
-      eslint:
-        specifier: ^9.39.1
-        version: 9.39.4(jiti@2.7.0)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  packages/types:
+  packages/shared:
     dependencies:
-      '@stackit/validations':
-        specifier: workspace:*
-        version: link:../validations
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.1.0
         version: 4.4.3
     devDependencies:
       '@stackit/eslint-config':
@@ -328,28 +298,6 @@ importers:
       '@stackit/tsconfig':
         specifier: workspace:*
         version: link:../config/tsconfig
-      eslint:
-        specifier: ^9.39.1
-        version: 9.39.4(jiti@2.7.0)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  packages/validations:
-    dependencies:
-      zod:
-        specifier: ^4.1.13
-        version: 4.4.3
-    devDependencies:
-      '@stackit/eslint-config':
-        specifier: workspace:*
-        version: link:../config/eslint-config
-      '@stackit/tsconfig':
-        specifier: workspace:*
-        version: link:../config/tsconfig
-      eslint:
-        specifier: ^9.39.1
-        version: 9.39.4(jiti@2.7.0)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

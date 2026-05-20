@@ -15,7 +15,6 @@
     "./guards": "./src/guards/index.ts"
   },
   "dependencies": {
-    "@stackit/validations": "workspace:*",
     "zod": "^4.1.0"
   },
   "devDependencies": {
