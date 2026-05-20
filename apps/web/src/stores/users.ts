@@ -1,9 +1,9 @@
+import type { users as userSchemas } from '@stackit/shared/schemas'
 import type { User } from '@stackit/shared/types'
-import { users as userSchemas } from '@stackit/shared/schemas'
+import type { z } from 'zod'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { z } from 'zod'
 
 type CreateUserInput = z.infer<typeof userSchemas.requests.CreateUserSchema>
 
