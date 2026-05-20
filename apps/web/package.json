@@ -20,9 +20,7 @@
   "dependencies": {
     "@rebnd/ui": "^0.0.4",
     "@stackit/auth": "workspace:*",
-    "@stackit/helpers": "workspace:*",
-    "@stackit/types": "workspace:*",
-    "@stackit/validations": "workspace:*",
+    "@stackit/shared": "workspace:*",
     "@tailwindcss/vite": "^4.1.17",
     "better-auth": "^1.4.4",
     "pinia": "^3.0.4",
