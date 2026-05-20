@@ -35,7 +35,7 @@ stackit/
 │   ├── agents/                 # Specialized subagents
 │   ├── docs/                   # Architecture, style guide, commit conventions
 │   └── settings.json
-├── infrastructure/             # Traefik config; reserved for k8s/terraform
+├── infrastructure/             # Infrastructure config; reserved for k8s/terraform
 ├── scripts/init.ts             # post-clone setup (pnpm setup) — self-deletes
 ├── docker-compose.yml
 └── Dockerfile                  # multi-stage: deps → api/web {build, dev, prod}
