@@ -1,9 +1,9 @@
-import type { UsersRepository } from './users.repository.js'
 import type { DatabaseClient } from '@stackit/db'
+import type { UsersRepository } from './users.repository.js'
 
 export function createUsersService(
   repository: UsersRepository,
-  db: DatabaseClient
+  _db: DatabaseClient,
 ) {
   return {
     async getUserById(id: string) {
@@ -26,7 +26,7 @@ export function createUsersService(
       return repository.list()
     },
 
-    async createUser(data: { email: string; name: string; emailVerified?: boolean }) {
+    async createUser(data: { email: string, name: string, emailVerified?: boolean }) {
       // Business logic: check for duplicates
       const existing = await repository.findByEmail(data.email)
       if (existing) {
@@ -36,7 +36,7 @@ export function createUsersService(
       return repository.create(data)
     },
 
-    async updateUser(id: string, data: { name?: string; email?: string }) {
+    async updateUser(id: string, data: { name?: string, email?: string }) {
       // Business logic: validate user exists
       const existing = await repository.findById(id)
       if (!existing) {

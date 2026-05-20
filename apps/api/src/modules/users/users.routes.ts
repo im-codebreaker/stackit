@@ -1,9 +1,9 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
+import { requests, UserSchema } from '@stackit/shared/schemas/users'
+import { z } from 'zod'
+import { createUsersHandlers } from './users.handlers.js'
 import { createUsersRepository } from './users.repository.js'
 import { createUsersService } from './users.service.js'
-import { createUsersHandlers } from './users.handlers.js'
-import { UserSchema, requests } from '@stackit/shared/schemas/users'
-import { z } from 'zod'
 
 const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
   // Initialize layers
@@ -21,7 +21,7 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    handlers.listUsers
+    handlers.listUsers,
   )
 
   // Get user by ID
@@ -35,7 +35,7 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    handlers.getUser
+    handlers.getUser,
   )
 
   // Create user
@@ -49,7 +49,7 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    handlers.createUser
+    handlers.createUser,
   )
 
   // Update user
@@ -64,7 +64,7 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    handlers.updateUser
+    handlers.updateUser,
   )
 
   // Delete user
@@ -78,7 +78,7 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
         },
       },
     },
-    handlers.deleteUser
+    handlers.deleteUser,
   )
 }
 

@@ -32,7 +32,7 @@ export function createUsersRepository(db: DatabaseClient) {
     async update(
       id: string,
       data: Partial<typeof users.$inferInsert>,
-      tx?: DatabaseClient
+      tx?: DatabaseClient,
     ) {
       const client = tx ?? db
       const [user] = await client

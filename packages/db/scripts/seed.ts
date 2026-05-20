@@ -1,10 +1,10 @@
 import process from 'node:process'
+import { scryptAsync } from '@noble/hashes/scrypt'
+import { bytesToHex, randomBytes } from '@noble/hashes/utils'
 import { eq } from 'drizzle-orm'
 import { createDatabaseClient } from '../src/client.js'
-import { users } from '../src/schema/users.js'
 import { accounts } from '../src/schema/auth.js'
-import { scryptAsync } from '@noble/hashes/scrypt'
-import { randomBytes, bytesToHex } from '@noble/hashes/utils'
+import { users } from '../src/schema/users.js'
 
 const databaseUrl = process.env.DATABASE_URL
 if (!databaseUrl) {
@@ -68,7 +68,8 @@ async function main() {
     if (user) {
       console.log(`  ✓ Created user: ${userData.email}`)
       createdUsers.push(user)
-    } else {
+    }
+    else {
       // User already exists, fetch it
       const [existingUser] = await db
         .select()

@@ -13,7 +13,7 @@ const healthRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request, reply) => {
       return reply.send({ status: 'ok' })
-    }
+    },
   )
 }
 

@@ -33,7 +33,7 @@ export async function build(opts: Record<string, unknown> = {}) {
   await app.register(autoLoad, {
     dir: join(__dirname, 'modules'),
     dirNameRoutePrefix: false,
-    matchFilter: (path) =>
+    matchFilter: path =>
       path.endsWith('.routes.js') || path.endsWith('.routes.ts'),
     autoHooks: true,
     cascadeHooks: true,
