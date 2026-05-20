@@ -67,6 +67,8 @@ pnpm db:migrate
 docker compose up --build --watch       # traefik, postgres, redis, api, web
 ```
 
+> **Note:** You may see `"../../.env not found. Continuing without it."` in logs — this is expected. Environment variables are set via `docker-compose.yml`, not the `.env` file (which is excluded by `.dockerignore`).
+
 Open <http://localhost>. Traefik on `:80` routes `/` → Vite, `/api` → Fastify, `/docs` → Swagger UI. The api and web containers also expose `:3000` and `:5173` directly if you prefer.
 
 API health: <http://localhost/api/v1/health> · OpenAPI docs: <http://localhost/docs>

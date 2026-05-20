@@ -88,9 +88,21 @@ services:
         - path: ./apps/api/src
           action: sync
           target: /stackit/apps/api/src
-        - path: ./packages
+          ignore:
+            - "**/*.log"
+        # Sync only source files, not generated outputs (drizzle/, dist/, etc.)
+        - path: ./packages/shared/src
           action: sync
-          target: /stackit/packages
+          target: /stackit/packages/shared/src
+        - path: ./packages/db/src
+          action: sync
+          target: /stackit/packages/db/src
+        - path: ./packages/auth/src
+          action: sync
+          target: /stackit/packages/auth/src
+        - path: ./packages/cache/src
+          action: sync
+          target: /stackit/packages/cache/src
         - path: ./apps/api/package.json
           action: rebuild
 
@@ -116,6 +128,11 @@ services:
         - path: ./apps/web/src
           action: sync
           target: /stackit/apps/web/src
+          ignore:
+            - "**/*.log"
+        - path: ./apps/web/index.html
+          action: sync
+          target: /stackit/apps/web/index.html
         - path: ./apps/web/package.json
           action: rebuild
 
