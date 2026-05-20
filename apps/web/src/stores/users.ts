@@ -17,9 +17,9 @@ export const useUsersStore = defineStore('users', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await api<{ users: User[], total: number }>('/v1/users')
-      users.value = data.users
-      total.value = data.total
+      const data = await api<User[]>('/v1/users')
+      users.value = data
+      total.value = data.length
     }
     catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load users'
