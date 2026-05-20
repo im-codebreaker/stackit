@@ -14,7 +14,7 @@ A clean, opinionated, modular pnpm monorepo for shipping a full-stack app fast.
 | Validation   | Zod v4 — shared between frontend and backend                |
 | Cache        | Redis (optional)                                             |
 | Auth         | better-auth (optional)                                       |
-| Tooling      | TypeScript, ESLint (antfu), Vitest, Docker, Traefik          |
+| Tooling      | TypeScript, ESLint (antfu), Vitest, Docker, Traefik, Turborepo |
 
 ## Quickstart
 
@@ -23,6 +23,7 @@ A clean, opinionated, modular pnpm monorepo for shipping a full-stack app fast.
 ```bash
 git clone git@github.com:im-codebreaker/stackit.git my-app
 cd my-app
+git remote set-url origin <your-repo-url>  # stackit is a template — point to your own repo
 pnpm install
 pnpm setup                              # interactive — pick optional modules + project name
 cp .env.example .env
@@ -36,10 +37,10 @@ pnpm dev                                # api on :3000, web on :5173
 
 ```bash
 cp .env.example .env
-docker compose up --build --watch       # nginx, postgres, redis, api, web
+docker compose up --build --watch       # traefik, postgres, redis, api, web
 ```
 
-Open <http://localhost>. An nginx proxy on `:80` routes `/` → Vite, `/api` → Fastify, `/docs` → Swagger UI. The api and web containers also expose `:3000` and `:5173` directly if you prefer.
+Open <http://localhost>. Traefik on `:80` routes `/` → Vite, `/api` → Fastify, `/docs` → Swagger UI. The api and web containers also expose `:3000` and `:5173` directly if you prefer.
 
 API health: <http://localhost/api/v1/health> · OpenAPI docs: <http://localhost/docs>
 
@@ -48,19 +49,17 @@ API health: <http://localhost/api/v1/health> · OpenAPI docs: <http://localhost/
 ```
 stackit/
 ├── apps/
-│   ├── api/                    Fastify backend (Zod-validated, autoloaded plugins/routes)
+│   ├── api/                    Fastify backend (domain modules, Zod-validated routes)
 │   └── web/                    Vue 3 SPA (Pinia, Vue Router, Tailwind v4)
 ├── packages/
-│   ├── validations/            @stackit/validations — Zod schemas (source of truth)
-│   ├── types/                  @stackit/types       — pure TS types & API envelopes
+│   ├── shared/                 @stackit/shared      — Zod schemas, TS types, utilities
 │   ├── db/                     @stackit/db          — Drizzle client + schema
 │   ├── cache/                  @stackit/cache       — Redis client (optional)
 │   ├── auth/                   @stackit/auth        — better-auth wrapper (optional)
-│   ├── helpers/                @stackit/helpers     — shared utilities
 │   └── config/
 │       ├── tsconfig/           shared tsconfigs (base, node, web, vitest)
 │       └── eslint-config/      shared ESLint config (wraps @antfu/eslint-config)
-├── infrastructure/             nginx config; reserved for k8s/terraform
+├── infrastructure/             traefik config; reserved for k8s/terraform
 ├── scripts/init.ts             post-clone setup (pnpm setup) — self-deletes
 ├── docker-compose.yml          traefik + postgres + redis + api + web
 └── Dockerfile                  multi-stage: deps → api/web {build,dev,prod}
@@ -68,16 +67,16 @@ stackit/
 
 ## Validation flow (Zod, end to end)
 
-1. Define a schema once in `packages/validations/src/<domain>/`.
+1. Define a schema once in `packages/shared/src/schemas/<domain>/`.
 2. Fastify route uses it via `fastify-type-provider-zod` — request/response inferred.
 3. Vue form imports the same schema and validates with the `useZodForm` composable.
 4. OpenAPI docs are generated from the schemas automatically.
 
 ```ts
-// packages/validations/src/users/requests.ts
+// packages/shared/src/schemas/users/requests.ts
 export const CreateUserSchema = z.object({ email: z.email(), name: z.string().min(1) })
 
-// apps/api/src/routes/users.ts
+// apps/api/src/modules/users/users.routes.ts
 fastify.post('/', { schema: users.routes.createUserRoute }, handlers.create)
 
 // apps/web/src/views/UsersView.vue
@@ -102,12 +101,15 @@ const { form, errors, validate } = useZodForm(users.requests.CreateUserSchema, {
 
 ## Architecture choices
 
+- **Turborepo** — task orchestration with intelligent caching. Run `pnpm dev` to start all apps in parallel, or `pnpm build` to build with cached layers.
 - **Source-only packages** — every shared package exports `./src/index.ts` directly. Apps compile through their own tooling (`tsx`, `vite`). No build step in `packages/`.
+- **Domain-based API modules** — each feature lives in `apps/api/src/modules/<domain>/` with its own routes, handlers, services, and repositories. Four-layer architecture: routes → handlers (HTTP) → services (business logic) → repositories (data access).
+- **Service layer** — business logic lives between handlers and repositories. Handlers deal with HTTP concerns (status codes, error mapping), services contain domain logic, repositories handle data access with optional transaction support.
 - **Autoloaded Fastify plugins** — drop a file in `plugins/external/` or `plugins/app/`; it registers automatically. Removing a feature is just deleting its file.
-- **Repository pattern** — handlers receive repositories via DI, repositories take an optional `tx` for Drizzle transactions.
+- **Repository pattern** — repositories accept an optional `tx?: DatabaseClient` parameter for participating in Drizzle transactions.
 - **pgvector-ready** — Drizzle natively supports the `vector` column type and `cosineDistance`/`l2Distance` operators. Add `CREATE EXTENSION IF NOT EXISTS vector;` to a migration, declare a `vector('embedding', { dimensions: 1536 })` column, and similarity queries become fully typed.
-- **Module augmentation** — `apps/api/src/types/fastify.d.ts` declares decorators (`fastify.db`, `fastify.usersRepository`, `fastify.cache`, `fastify.auth`).
-- **One demo domain (`users`)** — full CRUD slice with shared schemas, repository, handler, route, store, and view as a template to copy.
+- **Module augmentation** — `apps/api/src/types/fastify.d.ts` declares decorators (`fastify.db`, `fastify.cache`, `fastify.auth`).
+- **One demo domain (`users`)** — full CRUD slice with shared schemas, module structure (routes/handlers/services/repositories), store, and view as a template to copy.
 
 ## Optional modules
 
