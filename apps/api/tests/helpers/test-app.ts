@@ -6,8 +6,8 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod'
 
-import healthRoute from '../../src/routes/health.js'
 import errorHandler from '../../src/plugins/app/error-handler.js'
+import healthRoute from '../../src/routes/health.js'
 
 /**
  * Minimal test app — registers only what each test needs.
