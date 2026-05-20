@@ -4,6 +4,7 @@
 ###################################################
 FROM node:24-alpine AS base
 RUN apk add --no-cache libc6-compat tini && corepack enable && corepack prepare pnpm@10.33.0 --activate
+RUN addgroup -g 1001 nodejs && adduser -u 1001 -G nodejs -s /bin/sh -D nodejs
 WORKDIR /stackit
 ENV CI=true \
     PNPM_HOME="/pnpm" \
@@ -20,10 +21,11 @@ ENTRYPOINT ["/sbin/tini", "--"]
 # or packages/auth.
 ###################################################
 FROM base AS deps
-COPY pnpm-lock.yaml ./
+COPY --chown=nodejs:nodejs pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
-COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --offline
+COPY --chown=nodejs:nodejs . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --offline && \
+    chown -R nodejs:nodejs .
 
 ###################################################
 # API — build + dev + prod
@@ -34,15 +36,18 @@ RUN pnpm --filter @stackit/api run build
 
 FROM deps AS api-dev
 ENV NODE_ENV=development
+USER nodejs
 WORKDIR /stackit/apps/api
 EXPOSE 3000
 CMD ["pnpm", "dev"]
 
 FROM node:24-alpine AS api-prod
 RUN apk add --no-cache tini && corepack enable && corepack prepare pnpm@10.33.0 --activate
+RUN addgroup -g 1001 nodejs && adduser -u 1001 -G nodejs -s /bin/sh -D nodejs
 WORKDIR /stackit
 ENV NODE_ENV=production
-COPY --from=api-build /stackit /stackit
+COPY --from=api-build --chown=nodejs:nodejs /stackit /stackit
+USER nodejs
 WORKDIR /stackit/apps/api
 EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]
@@ -57,6 +62,7 @@ RUN pnpm --filter @stackit/web run build
 
 FROM deps AS web-dev
 ENV NODE_ENV=development
+USER nodejs
 WORKDIR /stackit/apps/web
 EXPOSE 5173
 CMD ["pnpm", "dev", "--host"]
