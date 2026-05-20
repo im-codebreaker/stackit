@@ -6,29 +6,29 @@ import { useUsersStore } from '@/stores/users'
 
 const store = useUsersStore()
 
-const initial: users.requests.CreateUserInput = { email: '', name: '' }
-const state = reactive({ ...initial })
+const initialState: users.requests.CreateUserInput = { email: '', name: '' }
+const state = reactive({ ...initialState })
 
 async function onSubmit(event: SubmitEvent & { state: users.requests.CreateUserInput | null }) {
   if (!event.state)
     return
   try {
     await store.create(event.state)
-    Object.assign(state, initial)
+    Object.assign(state, initialState)
   }
   catch (err) {
     console.error(err)
   }
 }
 
-onMounted(() => store.fetchAll())
+onMounted(store.fetchAll)
 </script>
 
 <template>
   <section class="space-y-8">
     <div>
       <h1 class="text-2xl font-bold">
-        Users
+        Userss
       </h1>
       <p class="text-sm text-slate-600 dark:text-slate-400">
         Demo CRUD using shared Zod schemas from <code>@stackit/shared/schemas</code>.

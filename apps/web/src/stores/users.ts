@@ -30,12 +30,12 @@ export const useUsersStore = defineStore('users', () => {
   }
 
   async function create(input: CreateUserInput) {
-    const data = await api<{ user: User }>('/v1/users', {
+    const user = await api<User>('/v1/users', {
       method: 'POST',
       body: JSON.stringify(input),
     })
     await fetchAll()
-    return data.user
+    return user
   }
 
   async function remove(id: string) {
