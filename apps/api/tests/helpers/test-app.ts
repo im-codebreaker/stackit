@@ -6,7 +6,7 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod'
 
-import healthRoute from '../../src/modules/health/health.routes.js'
+import healthRoute from '../../src/routes/health.js'
 import errorHandler from '../../src/plugins/app/error-handler.js'
 
 /**
