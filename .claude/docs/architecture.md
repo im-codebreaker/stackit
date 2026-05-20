@@ -14,11 +14,10 @@
 │   │  - Vue Router       │          │  - autoload         │                  │
 │   │  - Pinia            │          │  - Zod via          │                  │
 │   │  - Tailwind v4      │          │    type-provider    │                  │
-│   │  - useZodForm       │          │  - better-auth (opt)│                  │
 │   └──────────┬──────────┘          └──────────┬──────────┘                  │
 │              │                                │                             │
-│              │   @stackit/validations         │                             │
-│              └────────► (Zod, shared) ◄───────┘                             │
+│              │     @stackit/shared            │                             │
+│              └────────► (Zod, types, utils) ◄─┘                             │
 │                                               │                             │
 │                                    ┌──────────┴──────────┐                  │
 │                                    │                     │                  │
@@ -38,7 +37,7 @@
                               └─────────────┘       └─────────────┘
 ```
 
-The key insight: **`@stackit/validations` is the contract**. Both api and web import the same Zod schemas; the schemas drive route validation, response serialization, OpenAPI generation, and form validation.
+The key insight: **`@stackit/shared` is the contract**. Both api and web import the same Zod schemas; the schemas drive route validation, response serialization, OpenAPI generation, and form validation.
 
 ## Monorepo Structure
 
@@ -48,13 +47,16 @@ stackit/
 │   ├── api/                    # @stackit/api - Fastify backend
 │   │   └── src/
 │   │       ├── config/         # env loader (Zod-validated)
-│   │       ├── handlers/       # pure handler factories (take repositories)
 │   │       ├── lib/            # better-auth wrapper instance
+│   │       ├── modules/        # domain-based modules
+│   │       │   └── <domain>/   # e.g., users/
+│   │       │       ├── <domain>.routes.ts       # route registration + autoPrefix
+│   │       │       ├── <domain>.handlers.ts     # HTTP layer
+│   │       │       ├── <domain>.service.ts      # business logic
+│   │       │       └── <domain>.repository.ts   # data access
 │   │       ├── plugins/
-│   │       │   ├── app/        # db, redis, auth, repositories, error-handler
+│   │       │   ├── app/        # db, redis, auth, error-handler
 │   │       │   └── external/   # cors, helmet, rate-limit, swagger, sensible
-│   │       ├── repositories/   # Drizzle-typed factories
-│   │       ├── routes/         # autoloaded; export `autoPrefix`
 │   │       ├── types/          # FastifyInstance augmentation
 │   │       ├── app.ts          # builds & wires the app
 │   │       └── server.ts       # starts the server with close-with-grace
@@ -63,7 +65,7 @@ stackit/
 │       └── src/
 │           ├── assets/
 │           ├── components/     # reusable components (forms/, ui/)
-│           ├── composables/    # use* hooks (useZodForm, useAuth, ...)
+│           ├── composables/    # use* hooks (useAuth, useFetch, ...)
 │           ├── lib/            # api client, auth client
 │           ├── router/
 │           ├── stores/         # Pinia stores (composition style)
@@ -71,11 +73,19 @@ stackit/
 │           └── main.ts
 │
 ├── packages/
-│   ├── validations/            # @stackit/validations - Zod schemas (SOURCE OF TRUTH)
-│   │   └── src/<feature>/
-│   │       ├── requests.ts     # request body / query / params schemas
-│   │       ├── responses.ts    # response shapes
-│   │       └── routes.ts       # combined route schema objects
+│   ├── shared/                 # @stackit/shared - Zod schemas, TS types, utilities (SOURCE OF TRUTH)
+│   │   └── src/
+│   │       ├── schemas/        # Zod validation schemas
+│   │       │   └── <feature>/
+│   │       │       ├── requests.ts     # request body / query / params schemas
+│   │       │       ├── responses.ts    # response shapes
+│   │       │       └── routes.ts       # combined route schema objects
+│   │       ├── types/          # pure TS types & API envelopes
+│   │       ├── utils/          # shared utility functions
+│   │       ├── constants/      # shared constants
+│   │       ├── enums/          # shared enums
+│   │       ├── errors/         # custom error classes
+│   │       └── guards/         # type guards
 │   │
 │   ├── db/                     # @stackit/db - Drizzle client + schema
 │   │   ├── src/
@@ -87,15 +97,14 @@ stackit/
 │   │
 │   ├── cache/                  # @stackit/cache - Redis client (optional)
 │   ├── auth/                   # @stackit/auth - better-auth wrapper (optional)
-│   ├── types/                  # @stackit/types - pure TS types & envelopes
-│   ├── helpers/                # @stackit/helpers - shared utilities
 │   └── config/
 │       ├── tsconfig/           # base / node / web / vitest tsconfigs
 │       └── eslint-config/      # wraps @antfu/eslint-config
 │
 ├── .claude/                    # Claude Code configuration
-├── infrastructure/             # nginx configs
+├── infrastructure/             # Infrastructure configs
 ├── scripts/init.ts             # pnpm setup (self-deletes after first run)
+├── turbo.json                  # Turborepo task orchestration
 ├── docker-compose.yml
 └── Dockerfile                  # multi-stage: deps → api/web {dev, build, prod}
 ```
@@ -105,9 +114,7 @@ stackit/
 ```
 @stackit/api
 ├── @stackit/db                    # Drizzle client + schema
-├── @stackit/validations           # Zod schemas (shared with web)
-├── @stackit/types
-├── @stackit/helpers
+├── @stackit/shared                # Zod schemas, types, utilities (shared with web)
 ├── @stackit/auth      (optional)  # better-auth wrapper
 ├── @stackit/cache     (optional)  # Redis client
 ├── fastify
@@ -119,8 +126,7 @@ stackit/
 └── close-with-grace
 
 @stackit/web
-├── @stackit/validations           # same Zod schemas as api
-├── @stackit/types
+├── @stackit/shared                # same Zod schemas, types, utils as api
 ├── vue / vue-router / pinia
 ├── @rebnd/ui
 ├── tailwindcss v4
@@ -160,7 +166,7 @@ stackit/
    - else require request.session, else 401
 
 4. Route handler:
-   - Zod validates request from @stackit/validations
+   - Zod validates request from @stackit/shared
    - calls handlers.<x>(request, reply)
    - handler talks only to repositories (which own Drizzle)
 
@@ -187,22 +193,23 @@ stackit/
 
 5. Downstream:
    - $inferSelect / $inferInsert types update automatically
-   - Zod response/request schemas in @stackit/validations may need updates
+   - Zod response/request schemas in @stackit/shared may need updates
 ```
 
 ## Plugin Order (api/src/app.ts)
 
 ```
 app.register(autoload, { dir: 'plugins/external' })   // 1. third-party
-app.register(autoload, { dir: 'plugins/app' })        // 2. custom (db, auth, repos)
-app.register(autoload, { dir: 'routes',               // 3. routes
-  autoHooks: true,
-  cascadeHooks: true,
+app.register(autoload, { dir: 'plugins/app' })        // 2. custom (db, auth)
+app.register(autoload, {                              // 3. modules
+  dir: 'modules',
+  dirNameRoutePrefix: false,
+  matchFilter: (path) => path.endsWith('.routes.js') || path.endsWith('.routes.ts'),
   options: { prefix: '/api/v1' },
 })
 ```
 
-`cascadeHooks: true` makes `routes/autohooks.ts` apply to every nested route file. That's how the auth gate covers `/users`, `/projects`, etc. without per-route boilerplate.
+`cascadeHooks: true` would make `modules/autohooks.ts` apply to every nested route file. That's how the auth gate would cover `/users`, `/projects`, etc. without per-route boilerplate (if we implemented it).
 
 ## Environment Variables
 
@@ -247,15 +254,17 @@ OAUTH_GOOGLE_SECRET=
 ## Key Patterns
 
 ### Backend
+- **Turborepo** for task orchestration and caching across the workspace.
 - **Plugin encapsulation** via `fastify-plugin`; explicit `dependencies`.
-- **Repository pattern**: handlers take repositories, repositories own Drizzle. No Drizzle types past the repository boundary.
+- **Module architecture**: domain-based organization with four layers (routes → handlers → services → repositories).
+- **Repository pattern**: repositories own Drizzle, accept optional `tx?: DatabaseClient`. No Drizzle types past the repository boundary.
 - **Optional modules** marked with `MARKER_START` / `MARKER_END` comment blocks; `pnpm setup` prunes them.
-- **`autoPrefix`** export on each route file; mounted under `/api/v1` automatically.
-- **Zod-first**: schemas in `@stackit/validations` drive validation + OpenAPI + form validation.
+- **`autoPrefix`** export on each module's routes file; mounted under `/api/v1` automatically.
+- **Zod-first**: schemas in `@stackit/shared` drive validation + OpenAPI + form validation.
 
 ### Frontend
 - **Composition API** with `<script setup lang="ts">` only.
-- **`useZodForm`** binds Vue forms to the same Zod schemas as the api.
+- **`RForm`** from `@rebnd/ui` binds Vue forms to the same Zod schemas from `@stackit/shared` as the api.
 - **Pinia composition style** in `stores/<feature>.ts`.
 - **Tailwind utility-first**; scoped styles only when necessary.
 
