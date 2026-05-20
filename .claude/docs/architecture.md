@@ -158,12 +158,12 @@ stackit/
    - external/rate-limit → throttle
    - app/db             → fastify.db (Drizzle)
    - app/auth           → onRequest hook attaches request.session
-   - app/repositories   → fastify.usersRepository
    - app/error-handler  → setErrorHandler
 
-3. routes/autohooks.ts onRequest gate:
-   - public paths (/health, /auth, /docs) pass
-   - else require request.session, else 401
+3. Auth plugin (plugins/app/auth.ts) onRequest hook:
+   - attaches request.session from better-auth
+   - public paths (/health, /auth, /docs) automatically accessible
+   - protected routes check session availability
 
 4. Route handler:
    - Zod validates request from @stackit/shared
@@ -209,7 +209,7 @@ app.register(autoload, {                              // 3. modules
 })
 ```
 
-`cascadeHooks: true` would make `modules/autohooks.ts` apply to every nested route file. That's how the auth gate would cover `/users`, `/projects`, etc. without per-route boilerplate (if we implemented it).
+`autoHooks: true` and `cascadeHooks: true` enable hook inheritance. The auth plugin's onRequest hook (registered in plugins/app/) applies to all routes automatically. No per-module auth boilerplate needed.
 
 ## Environment Variables
 
