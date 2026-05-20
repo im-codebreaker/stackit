@@ -2,7 +2,6 @@
 // Import order is load-bearing: REDIS_AUGMENT / AUTH_AUGMENT marker blocks
 // are removed independently by `pnpm setup` if those modules are declined.
 import type { DatabaseClient } from '@stackit/db'
-import type { createUsersRepository } from '../repositories/users.js'
 // REDIS_AUGMENT_START
 import type { RedisClientType } from '@stackit/cache'
 // REDIS_AUGMENT_END
@@ -13,7 +12,6 @@ import type { createAuth } from '@stackit/auth'
 declare module 'fastify' {
   interface FastifyInstance {
     db: DatabaseClient
-    usersRepository: ReturnType<typeof createUsersRepository>
 
     // REDIS_DECORATOR_START
     cache: RedisClientType

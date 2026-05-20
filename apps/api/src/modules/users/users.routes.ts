@@ -2,11 +2,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { createUsersRepository } from './users.repository.js'
 import { createUsersService } from './users.service.js'
 import { createUsersHandlers } from './users.handlers.js'
-import {
-  userCreateSchema,
-  userUpdateSchema,
-  userResponseSchema,
-} from '@stackit/shared/schemas/users'
+import { UserSchema, requests } from '@stackit/shared/schemas/users'
 import { z } from 'zod'
 
 const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -21,7 +17,7 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       schema: {
         response: {
-          200: z.array(userResponseSchema),
+          200: z.array(UserSchema),
         },
       },
     },
@@ -35,7 +31,7 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         params: z.object({ id: z.string() }),
         response: {
-          200: userResponseSchema,
+          200: UserSchema,
         },
       },
     },
@@ -47,9 +43,9 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
     '/',
     {
       schema: {
-        body: userCreateSchema,
+        body: requests.CreateUserSchema,
         response: {
-          201: userResponseSchema,
+          201: UserSchema,
         },
       },
     },
@@ -62,9 +58,9 @@ const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       schema: {
         params: z.object({ id: z.string() }),
-        body: userUpdateSchema,
+        body: requests.UpdateUserSchema,
         response: {
-          200: userResponseSchema,
+          200: UserSchema,
         },
       },
     },
