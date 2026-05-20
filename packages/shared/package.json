@@ -1,0 +1,25 @@
+{
+  "name": "@stackit/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas/index.ts",
+    "./schemas/*": "./src/schemas/*/index.ts",
+    "./types": "./src/types/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./constants": "./src/constants/index.ts",
+    "./enums": "./src/enums/index.ts",
+    "./errors": "./src/errors/index.ts",
+    "./guards": "./src/guards/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@stackit/eslint-config": "workspace:*",
+    "@stackit/tsconfig": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}
