@@ -14,22 +14,20 @@ stackit is a pnpm-workspace monorepo template designed to be cloned, customized 
 | Validation   | Zod v4 — shared between frontend and backend                |
 | Cache        | Redis (optional)                                             |
 | Auth         | better-auth (optional)                                       |
-| Tooling      | TypeScript, ESLint (antfu), Vitest, Docker                   |
+| Tooling      | TypeScript, ESLint (antfu), Vitest, Docker, Turborepo       |
 
 ## Monorepo Structure
 
 ```
 stackit/
 ├── apps/
-│   ├── api/                    # @stackit/api - Fastify backend
+│   ├── api/                    # @stackit/api - Fastify backend (domain modules)
 │   └── web/                    # @stackit/web - Vue 3 SPA
 ├── packages/
-│   ├── validations/            # @stackit/validations - Zod schemas (SOURCE OF TRUTH)
-│   ├── types/                  # @stackit/types - pure TS types & API envelopes
+│   ├── shared/                 # @stackit/shared - Zod schemas, types, utilities (SOURCE OF TRUTH)
 │   ├── db/                     # @stackit/db - Drizzle client + schema
 │   ├── cache/                  # @stackit/cache - Redis client (optional)
 │   ├── auth/                   # @stackit/auth - better-auth wrapper (optional)
-│   ├── helpers/                # @stackit/helpers - shared utilities
 │   └── config/
 │       ├── tsconfig/           # shared tsconfigs
 │       └── eslint-config/      # shared ESLint config (wraps @antfu/eslint-config)
@@ -37,13 +35,15 @@ stackit/
 │   ├── agents/                 # Specialized subagents
 │   ├── docs/                   # Architecture, style guide, commit conventions
 │   └── settings.json
-├── infrastructure/             # nginx config
+├── infrastructure/             # Traefik config; reserved for k8s/terraform
 ├── scripts/init.ts             # post-clone setup (pnpm setup) — self-deletes
 ├── docker-compose.yml
 └── Dockerfile                  # multi-stage: deps → api/web {build, dev, prod}
 ```
 
 ## Development Commands
+
+All workspace commands use Turborepo for task orchestration and caching. `pnpm dev` becomes `turbo run dev`, `pnpm build` becomes `turbo run build`, etc. Turbo caches outputs and only rebuilds what changed.
 
 ```bash
 # Setup (one-time, removes itself after running)
@@ -95,12 +95,10 @@ stackit uses **[Conventional Commits 1.0.0](https://www.conventionalcommits.org/
 - `db` — `packages/db/**` (schema, migrations, client)
 - `auth` — `packages/auth/**` (better-auth wrapper)
 - `cache` — `packages/cache/**` (Redis)
-- `validations` — `packages/validations/**` (Zod schemas)
-- `types` — `packages/types/**`
-- `helpers` — `packages/helpers/**`
+- `shared` — `packages/shared/**` (schemas, types, utilities)
 - `config` — `packages/config/**` (tsconfig, eslint)
 - `infra` — `Dockerfile`, `docker-compose.yml`, `infrastructure/**`
-- `repo` — root package.json, scripts/, workspace-level config
+- `repo` — root package.json, scripts/, workspace-level config, turbo.json
 - `deps` — dependency bumps that span packages
 - `docs` — README, `.claude/docs/**`, in-repo documentation
 
@@ -124,20 +122,20 @@ For the full spec, scope decisions, and breaking-change handling, see [`./docs/c
 2. **Consistency** — follow established patterns; canonical examples are linked in [`./docs/style-guide.md`](./docs/style-guide.md)
 3. **Simplicity** — no premature abstractions, no speculative generality
 4. **Type safety** — no `any`, use `unknown` when truly unknown
-5. **Zod is the source of truth** — every cross-boundary data shape (request, response, DTO, form) lives in `@stackit/validations`
+5. **Zod is the source of truth** — every cross-boundary data shape (request, response, DTO, form) lives in `@stackit/shared`
 
 ### Naming
 
 | Type | Convention | Example |
 |------|------------|---------|
-| TS files | `kebab-case` | `user-handlers.ts` |
+| TS files | `kebab-case` | `users.service.ts`, `users.repository.ts` |
 | Vue components | `PascalCase` | `UserCard.vue` |
 | Vars / functions | `camelCase` | `getUserById` |
 | Constants | `UPPER_SNAKE_CASE` | `MAX_RETRIES` |
 | Types / interfaces | `PascalCase` | `UserRepository` |
 | Booleans | `is/has/should` prefix | `isActive`, `hasPermission` |
 | Pinia stores | `*.ts` in `stores/` | `auth.ts`, `users.ts` |
-| Composables | `use*` prefix | `useZodForm` |
+| Composables | `use*` prefix | `useFetch`, `useAuth` |
 
 ### TypeScript
 
@@ -163,29 +161,93 @@ export default fp(async (fastify) => {
 
 Removing a feature is just deleting its plugin file — autoload picks up the rest.
 
-### Routes & Handlers & Repositories
+### Module Architecture
 
-- Route file in `apps/api/src/routes/<feature>.ts` exports `autoPrefix = '/feature'`.
-- Handler factory in `apps/api/src/handlers/<feature>.ts` takes a repository, returns route handlers.
-- Repository factory in `apps/api/src/repositories/<feature>.ts` takes the `DatabaseClient`, returns query methods. Each method accepts an optional `tx?: DbClient` so it can participate in an outer transaction.
+API features are organized as domain modules in `apps/api/src/modules/<domain>/`:
+
+```
+modules/users/
+├── users.routes.ts      # Route definitions + autoPrefix export
+├── users.handlers.ts    # HTTP layer (status codes, error mapping)
+├── users.service.ts     # Business logic
+└── users.repository.ts  # Data access (Drizzle queries)
+```
+
+**Four-layer architecture:**
+
+1. **Routes** (`*.routes.ts`) — Fastify route registration, schema validation via Zod, exports `autoPrefix`
+2. **Handlers** (`*.handlers.ts`) — HTTP concerns (parsing params, mapping errors to status codes, formatting responses)
+3. **Services** (`*.service.ts`) — Business logic, orchestration, transaction management
+4. **Repositories** (`*.repository.ts`) — Data access, Drizzle queries, accepts optional `tx?: DatabaseClient`
 
 ```ts
-// repository — typed against Drizzle, transactions optional
+// users.repository.ts — data access with transaction support
 export function createUsersRepository(db: DatabaseClient) {
   return {
-    async findById(id: string, tx?: DbClient): Promise<User | undefined> {
-      return (tx ?? db).query.users.findFirst({ where: eq(users.id, id) })
+    async findById(id: string, tx?: DatabaseClient) {
+      const client = tx ?? db
+      return client.query.users.findFirst({ where: eq(users.id, id) })
     },
-    // ...
   }
 }
+
+// users.service.ts — business logic
+export function createUsersService(
+  repository: UsersRepository,
+  db: DatabaseClient
+) {
+  return {
+    async getUserById(id: string) {
+      const user = await repository.findById(id)
+      if (!user) throw new Error('User not found')
+      return user
+    },
+  }
+}
+
+// users.handlers.ts — HTTP layer
+export function createUsersHandlers(service: UsersService) {
+  return {
+    async getUser(request, reply) {
+      try {
+        const { id } = request.params
+        const user = await service.getUserById(id)
+        return reply.send(user)
+      } catch (error) {
+        if (error.message === 'User not found') {
+          return reply.status(404).send({ error: error.message })
+        }
+        throw error
+      }
+    },
+  }
+}
+
+// users.routes.ts — route registration
+const usersRoutes: FastifyPluginAsyncZod = async (fastify) => {
+  const repository = createUsersRepository(fastify.db)
+  const service = createUsersService(repository, fastify.db)
+  const handlers = createUsersHandlers(service)
+  
+  fastify.get('/:id', {
+    schema: {
+      params: z.object({ id: z.string() }),
+      response: { 200: UserSchema }
+    }
+  }, handlers.getUser)
+}
+
+export default usersRoutes
+export const autoPrefix = '/users'
 ```
+
+Modules are autoloaded from `apps/api/src/modules/` — the app scans for `*.routes.ts` files and registers them with the `autoPrefix` path.
 
 ### Validation
 
-- Zod schemas live in `packages/validations/src/<feature>/` and are imported by both api and web.
+- Zod schemas live in `packages/shared/src/schemas/<feature>/` and are imported by both api and web.
 - The Fastify route uses `fastify-type-provider-zod` to validate request and serialize response from the same schema.
-- The Vue form uses `useZodForm` with the same schema.
+- The Vue form uses `RForm` from `@rebnd/ui` with the same schema.
 - OpenAPI docs are derived from the Zod schemas automatically.
 
 ### Error Handling
@@ -201,7 +263,7 @@ export function createUsersRepository(db: DatabaseClient) {
 - Composables in `apps/web/src/composables/`, prefixed `use*`.
 - Pinia stores in `apps/web/src/stores/<feature>.ts`, composition style.
 - Vue Router in `apps/web/src/router/`.
-- Forms use `useZodForm` with the shared Zod schema from `@stackit/validations`.
+- Forms use `RForm` from `@rebnd/ui` with the shared Zod schema from `@stackit/shared`.
 - Styling via Tailwind v4 (no custom CSS unless unavoidable).
 
 See [`./docs/style-guide.md`](./docs/style-guide.md) and the [`vue-expert`](./agents/vue-expert.md) agent for full conventions and anti-patterns.
@@ -212,7 +274,7 @@ See [`./docs/style-guide.md`](./docs/style-guide.md) and the [`vue-expert`](./ag
 - `casing: 'snake_case'` in `drizzle.config.ts` maps camelCase TS columns to snake_case SQL automatically.
 - Migrations under `packages/db/drizzle/` — committed to git.
 - The `users` schema file uses `// BETTER_AUTH_RELATIONS_START/END` markers; `pnpm setup` removes those blocks when auth is declined.
-- Repository pattern (see Backend Patterns above) keeps Drizzle types confined to `repositories/` and `@stackit/db`.
+- Repository pattern (see Backend Patterns above) keeps Drizzle types confined to module repositories and `@stackit/db`.
 
 **pgvector-ready**: Drizzle natively supports `vector('embedding', { dimensions: 1536 })` and typed `cosineDistance` / `l2Distance` operators. Add `CREATE EXTENSION IF NOT EXISTS vector;` to a migration when you need it.
 
@@ -244,13 +306,14 @@ Delegate to subagents when the task is domain-specific. Each agent encodes proje
 
 ### Adding a new API domain (e.g., `projects`)
 
-1. Define Zod schemas in `packages/validations/src/projects/{requests,responses,routes}.ts`.
+1. Define Zod schemas in `packages/shared/src/schemas/projects/{requests,responses}.ts`.
 2. Add Drizzle table in `packages/db/src/schema/projects.ts` and re-export from `schema/index.ts`.
 3. Run `pnpm db:generate` then `pnpm db:push` (or `db:migrate` in prod).
-4. Create repository in `apps/api/src/repositories/projects.ts` (factory + optional `tx`).
-5. Expose it via the `repositories` plugin (`apps/api/src/plugins/app/repositories.ts`) and add the decorator type in `apps/api/src/types/fastify.d.ts`.
-6. Add handlers in `apps/api/src/handlers/projects.ts`.
-7. Wire routes in `apps/api/src/routes/projects.ts` with `autoPrefix = '/projects'`.
+4. Create module directory: `apps/api/src/modules/projects/`.
+5. Add repository: `apps/api/src/modules/projects/projects.repository.ts` (factory with optional `tx`).
+6. Add service: `apps/api/src/modules/projects/projects.service.ts` (business logic).
+7. Add handlers: `apps/api/src/modules/projects/projects.handlers.ts` (HTTP layer).
+8. Wire routes: `apps/api/src/modules/projects/projects.routes.ts` with `export const autoPrefix = '/projects'`.
 
 ### Adding a new Vue page
 
@@ -258,7 +321,7 @@ Delegate to subagents when the task is domain-specific. Each agent encodes proje
 2. Route entry in `apps/web/src/router/index.ts`.
 3. Pinia store in `apps/web/src/stores/<feature>.ts` if state is shared.
 4. Composable in `apps/web/src/composables/` if behavior is reusable.
-5. Forms use `useZodForm` + shared Zod schema from `@stackit/validations`.
+5. Forms use `RForm` from `@rebnd/ui` + shared Zod schema from `@stackit/shared`.
 
 ### Database schema change
 
