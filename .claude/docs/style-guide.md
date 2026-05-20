@@ -12,14 +12,13 @@ Canonical examples of project patterns. Read the relevant one before implementin
 | Server startup | `apps/api/src/server.ts` |
 | Env loader (Zod-validated) | `apps/api/src/config/env.ts` |
 | App plugin (db) | `apps/api/src/plugins/app/db.ts` |
-| App plugin (repositories) | `apps/api/src/plugins/app/repositories.ts` |
 | App plugin (auth, optional) | `apps/api/src/plugins/app/auth.ts` |
 | Error handler | `apps/api/src/plugins/app/error-handler.ts` |
 | External plugin (swagger) | `apps/api/src/plugins/external/swagger.ts` |
-| Repository (Drizzle queries) | `apps/api/src/repositories/users.ts` |
-| Handler factory | `apps/api/src/handlers/users.ts` |
-| Route (Zod-typed) | `apps/api/src/routes/users.ts` |
-| Auth gate | `apps/api/src/routes/autohooks.ts` |
+| Module routes | `apps/api/src/modules/users/users.routes.ts` |
+| Module handlers (HTTP layer) | `apps/api/src/modules/users/users.handlers.ts` |
+| Module service (business logic) | `apps/api/src/modules/users/users.service.ts` |
+| Module repository (data access) | `apps/api/src/modules/users/users.repository.ts` |
 | Decorator augmentation | `apps/api/src/types/fastify.d.ts` |
 | better-auth wrapper | `apps/api/src/lib/auth.ts` |
 
@@ -33,7 +32,6 @@ Canonical examples of project patterns. Read the relevant one before implementin
 | CRUD list view | `apps/web/src/views/UsersView.vue` |
 | Router | `apps/web/src/router/index.ts` |
 | Pinia store | `apps/web/src/stores/auth.ts` |
-| Zod-form composable | `apps/web/src/composables/useZodForm.ts` |
 | API client | `apps/web/src/lib/api.ts` |
 | Auth client | `apps/web/src/lib/auth-client.ts` |
 
@@ -41,15 +39,16 @@ Canonical examples of project patterns. Read the relevant one before implementin
 
 | Pattern | Reference File |
 |---------|----------------|
-| Validation barrel | `packages/validations/src/index.ts` |
-| Request schemas | `packages/validations/src/users/requests.ts` |
-| Response schemas | `packages/validations/src/users/responses.ts` |
-| Route schemas (combined) | `packages/validations/src/users/routes.ts` |
-| Shared timestamps schema | `packages/validations/src/shared/timestamps.ts` |
+| Schemas barrel | `packages/shared/src/schemas/index.ts` |
+| Request schemas | `packages/shared/src/schemas/users/requests.ts` |
+| Response schemas | `packages/shared/src/schemas/users/responses.ts` |
+| Route schemas (combined) | `packages/shared/src/schemas/users/routes.ts` |
+| Shared timestamps schema | `packages/shared/src/schemas/shared/timestamps.ts` |
+| Types barrel | `packages/shared/src/types/index.ts` |
+| Utilities barrel | `packages/shared/src/utils/index.ts` |
 | Drizzle client factory | `packages/db/src/client.ts` |
 | Drizzle schema | `packages/db/src/schema/users.ts` |
 | Drizzle migrations | `packages/db/drizzle/` |
-| Helpers | `packages/helpers/src/index.ts` |
 
 ## General Principles
 
@@ -58,7 +57,7 @@ Canonical examples of project patterns. Read the relevant one before implementin
 - **Simplicity** — no speculative abstractions; three repeated lines is fine, premature DRY is not.
 - **Documentation** — code should be self-documenting; only comment the *why* (constraints, invariants, gotchas).
 - **Testability** — write tests for non-trivial logic.
-- **Zod is the contract** — every cross-boundary shape lives in `@stackit/validations`.
+- **Zod is the contract** — every cross-boundary shape lives in `@stackit/shared`.
 
 ## TypeScript & JavaScript
 
@@ -187,8 +186,8 @@ Script section order:
 - Navigate with `useRouter()` — never `window.location`.
 
 **Forms**
-- Zod schemas come from `@stackit/validations` — never duplicated in the frontend.
-- `useZodForm(SchemaFromValidations, initialValues)`.
+- Zod schemas come from `@stackit/shared` — never duplicated in the frontend.
+- Use `RForm` from `@rebnd/ui` with schemas: `<RForm :schema="schemaFromShared" :state="state" />`.
 - Always provide error messages.
 - Prefer `v-model` over manual `:value` + `@input`.
 
@@ -233,10 +232,10 @@ async function plugin(fastify: FastifyInstance) {
 export default fp(plugin, { name: 'my-plugin' })
 ```
 
-**Routes**
-- One file per domain in `apps/api/src/routes/`.
-- Export `autoPrefix = '/feature'`.
-- Schemas come from `@stackit/validations/<feature>/routes`.
+**Modules**
+- One directory per domain in `apps/api/src/modules/<domain>/`.
+- Each module has: `<domain>.routes.ts` (exports `autoPrefix`), `<domain>.handlers.ts`, `<domain>.service.ts`, `<domain>.repository.ts`.
+- Schemas come from `@stackit/shared/schemas/<feature>/`.
 
 **Validation**
 - `fastify-type-provider-zod` — Zod is the single schema language.
@@ -299,9 +298,9 @@ export const users = pgTable('users', {
 - `db.transaction(async (tx) => …)` for atomicity; pass `tx` into repository methods.
 
 **Repository pattern**
-- One file per domain: `apps/api/src/repositories/<feature>.ts`.
+- One repository per domain within its module: `apps/api/src/modules/<feature>/<feature>.repository.ts`.
 - Factory function taking the `DatabaseClient`.
-- Each method accepts `tx?: DbClient` so it can join an outer transaction.
+- Each method accepts `tx?: DatabaseClient` so it can join an outer transaction.
 - Drizzle types never leak past the repository boundary.
 
 **Error handling**
