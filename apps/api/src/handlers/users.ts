@@ -1,6 +1,10 @@
-import type { CreateUserInput, UpdateUserInput } from '@stackit/validations/users/requests'
+import { users as userSchemas } from '@stackit/shared/schemas'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { createUsersRepository } from '../repositories/users.js'
+import type { z } from 'zod'
+
+type CreateUserInput = z.infer<typeof userSchemas.requests.CreateUserSchema>
+type UpdateUserInput = z.infer<typeof userSchemas.requests.UpdateUserSchema>
 
 export function createUserHandlers(repo: ReturnType<typeof createUsersRepository>) {
   return {
