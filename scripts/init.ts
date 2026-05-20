@@ -168,11 +168,10 @@ function renameProject(projectName: string) {
   const namespace = projectName.startsWith('@') ? projectName : `@${projectName}`
 
   // Recursively replace @stackit/ across known package & ts files
+  // Note: docker-compose.yml and Dockerfile use /app (generic) so don't need renaming
   const targets = [
     'package.json',
     'pnpm-workspace.yaml',
-    'docker-compose.yml',
-    'Dockerfile',
     '.env.example',
     'README.md',
     ...findFiles(join(ROOT, 'apps'), /\.(json|ts|vue|mjs)$/),

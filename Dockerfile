@@ -5,7 +5,7 @@
 FROM node:24-alpine AS base
 RUN apk add --no-cache libc6-compat tini && corepack enable && corepack prepare pnpm@10.33.0 --activate
 RUN addgroup -g 1001 nodejs && adduser -u 1001 -G nodejs -s /bin/sh -D nodejs
-WORKDIR /stackit
+WORKDIR /app
 ENV CI=true \
     PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH"
@@ -37,18 +37,18 @@ RUN pnpm --filter @stackit/api run build
 FROM deps AS api-dev
 ENV NODE_ENV=development
 USER nodejs
-WORKDIR /stackit/apps/api
+WORKDIR /app/apps/api
 EXPOSE 3000
 CMD ["pnpm", "dev"]
 
 FROM node:24-alpine AS api-prod
 RUN apk add --no-cache tini && corepack enable && corepack prepare pnpm@10.33.0 --activate
 RUN addgroup -g 1001 nodejs && adduser -u 1001 -G nodejs -s /bin/sh -D nodejs
-WORKDIR /stackit
+WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=api-build --chown=nodejs:nodejs /stackit /stackit
+COPY --from=api-build --chown=nodejs:nodejs /app /app
 USER nodejs
-WORKDIR /stackit/apps/api
+WORKDIR /app/apps/api
 EXPOSE 3000
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "dist/server.js"]
@@ -63,7 +63,7 @@ RUN pnpm --filter @stackit/web run build
 FROM deps AS web-dev
 ENV NODE_ENV=development
 USER nodejs
-WORKDIR /stackit/apps/web
+WORKDIR /app/apps/web
 EXPOSE 5173
 CMD ["pnpm", "dev", "--host"]
 
