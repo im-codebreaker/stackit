@@ -69,18 +69,56 @@ stackit/
 
 1. Define a schema once in `packages/shared/src/schemas/<domain>/`.
 2. Fastify route uses it via `fastify-type-provider-zod` — request/response inferred.
-3. Vue form imports the same schema and validates with the `useZodForm` composable.
+3. Vue form imports the same schema and validates with `RForm` from `@rebnd/ui`.
 4. OpenAPI docs are generated from the schemas automatically.
 
 ```ts
 // packages/shared/src/schemas/users/requests.ts
-export const CreateUserSchema = z.object({ email: z.email(), name: z.string().min(1) })
+export const CreateUserSchema = z.object({
+  email: z.email(),
+  name: z.string().min(1).max(120),
+})
+export type CreateUserInput = z.infer<typeof CreateUserSchema>
 
+// Import in API: import { requests } from '@stackit/shared/schemas/users'
 // apps/api/src/modules/users/users.routes.ts
-fastify.post('/', { schema: users.routes.createUserRoute }, handlers.create)
+fastify.post(
+  '/',
+  {
+    schema: {
+      body: requests.CreateUserSchema,
+      response: {
+        201: UserSchema,
+      },
+    },
+  },
+  handlers.createUser
+)
 
+// Import in web: import { users } from '@stackit/shared/schemas'
 // apps/web/src/views/UsersView.vue
-const { form, errors, validate } = useZodForm(users.requests.CreateUserSchema, { email: '', name: '' })
+<script setup lang="ts">
+import { RForm } from '@rebnd/ui'
+import { users } from '@stackit/shared/schemas'
+import { reactive } from 'vue'
+
+const state = reactive<users.requests.CreateUserInput>({ email: '', name: '' })
+
+async function onSubmit(event: SubmitEvent & { state: users.requests.CreateUserInput | null }) {
+  if (!event.state) return
+  // Handle submission
+}
+</script>
+
+<template>
+  <RForm
+    :schema="users.requests.CreateUserSchema"
+    :state="state"
+    @submit="onSubmit"
+  >
+    <!-- form fields -->
+  </RForm>
+</template>
 ```
 
 ## Scripts (root)
