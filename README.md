@@ -24,7 +24,10 @@ A clean, opinionated, modular pnpm monorepo for shipping a full-stack app fast.
 # Clone and setup
 git clone git@github.com:im-codebreaker/stackit.git my-app
 cd my-app
-git remote set-url origin <your-repo-url>  # stackit is a template
+
+# Point to your own repo (choose one):
+git remote set-url origin <your-repo-url>  # change remote
+git remote remove origin                    # or remove entirely
 ```
 
 ```bash
@@ -53,7 +56,14 @@ pnpm dev  # api on :3000, web on :5173
 **Full stack in docker** — everything containerized, hot-reload via `--watch`:
 
 ```bash
+# Configure environment
 cp .env.example .env
+
+# Start infrastructure and run migrations
+docker compose up -d postgres redis
+pnpm db:migrate
+
+# Start all services with watch mode
 docker compose up --build --watch       # traefik, postgres, redis, api, web
 ```
 
