@@ -13,17 +13,13 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers: HeadersInit = { ...init.headers }
-
-  // Only set Content-Type if there's a body
-  if (init.body) {
-    headers['Content-Type'] = 'application/json'
-  }
-
   const response = await fetch(`${baseUrl}${path}`, {
     credentials: 'include',
     ...init,
-    headers,
+    headers: {
+      ...init.headers,
+      ...(init.body && { 'Content-Type': 'application/json' }),
+    },
   })
 
   const text = await response.text()
